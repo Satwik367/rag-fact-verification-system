@@ -10,33 +10,43 @@ This system instead retrieves real evidence for a claim and asks an LLM to reaso
 
 ## How It Works (RAG Pipeline)
 
-User Input (claim or article)
-│
-▼
-┌─────────────────────┐
-│ 1. Claim Extraction │ Gemini parses input and extracts discrete,
-│ (LLM) │ independently verifiable factual claims
-└─────────────────────┘
-│
-▼
-┌─────────────────────┐
-│ 2. Evidence │ Live web search (Tavily) +
-│ Retrieval (RAG) │ curated vector knowledge base (ChromaDB)
-│ │ retrieved via semantic similarity search
-└─────────────────────┘
-│
-▼
-┌─────────────────────┐
-│ 3. Verdict │ Gemini compares claim against retrieved
-│ Generation (LLM) │ evidence → supported / contradicted /
-│ │ unverifiable, with confidence + citations
-└─────────────────────┘
-│
-▼
-┌─────────────────────┐
-│ 4. Presentation │ Verdict + confidence + expandable citations,
-│ │ aggregate credibility score for articles
-└─────────────────────┘
+```mermaid
+flowchart TD
+    A["User Input\n(single claim or full article)"] --> B
+
+    subgraph B["1 · Claim Extraction (LLM)"]
+        B1["Gemini parses the input and extracts discrete,\nindependently verifiable factual claims"]
+    end
+
+    B --> C
+
+    subgraph C["2 · Evidence Retrieval (RAG)"]
+        direction LR
+        C1["Live web search\n(Tavily)"]
+        C2["Curated vector knowledge base\n(ChromaDB, semantic similarity search)"]
+        C1 --> C3["Merged / hybrid evidence set"]
+        C2 --> C3
+    end
+
+    C --> D
+
+    subgraph D["3 · Verdict Generation (LLM)"]
+        D1["Gemini compares the claim against retrieved evidence\n→ supported / contradicted / unverifiable\n(with confidence score + citations)"]
+    end
+
+    D --> E
+
+    subgraph E["4 · Presentation"]
+        E1["Verdict + confidence + expandable citations\nAggregate credibility score for multi-claim articles"]
+    end
+```
+
+Each stage maps directly to a backend service — see [Architecture](#architecture) below for the corresponding files.
+
+1. **Claim Extraction** (`services/claimExtraction.js`) — Gemini parses the raw input and pulls out discrete, independently verifiable factual claims.
+2. **Evidence Retrieval** (`services/webSearchRetrieval.js`, `services/vectorStore.js`, `services/evidenceRetrieval.js`) — each claim is checked against live web search results (Tavily) and a curated vector knowledge base (ChromaDB), merged into a single hybrid evidence set.
+3. **Verdict Generation** (`services/verdictGeneration.js`) — Gemini reasons over the claim + evidence and returns a verdict (`supported` / `contradicted` / `unverifiable`), a confidence score, and cited sources.
+4. **Presentation** — the frontend renders the verdict, confidence, and expandable citations per claim, plus an aggregate credibility score (`services/aggregateScore.js`) when verifying a full article.
 
 ## Features
 
@@ -71,35 +81,40 @@ User Input (claim or article)
 
 ## Architecture
 
+```
 fact-check-rag/
 ├── backend/
-│ ├── server.js # Express entry point
-│ ├── config/
-│ │ ├── db.js # MongoDB connection
-│ │ └── geminiClient.js # Gemini API wrapper (JSON generation, embeddings, retry logic)
-│ ├── routes/
-│ │ └── verify.js # /verify, /verify-article, /history, /kb/add endpoints
-│ ├── services/
-│ │ ├── claimExtraction.js # Stage 1: extract claims from input
-│ │ ├── webSearchRetrieval.js # Stage 2a: live web search (Tavily)
-│ │ ├── vectorStore.js # Stage 2b: curated KB (ChromaDB)
-│ │ ├── evidenceRetrieval.js # Merges web + vector evidence (hybrid mode)
-│ │ ├── verdictGeneration.js # Stage 3: LLM verdict + citations
-│ │ └── aggregateScore.js # Phase 3: multi-claim credibility scoring
-│ ├── models/
-│ │ └── QueryHistory.js # MongoDB schema for past queries
-│ └── scripts/
-│ └── seedKnowledgeBase.js # Populates the curated vector KB
+│   ├── server.js                    # Express entry point
+│   ├── config/
+│   │   ├── db.js                    # MongoDB connection
+│   │   └── geminiClient.js          # Gemini API wrapper (JSON generation, embeddings, retry logic)
+│   ├── routes/
+│   │   └── verify.js                # /verify, /verify-article, /history, /kb/add endpoints
+│   ├── services/
+│   │   ├── claimExtraction.js       # Stage 1: extract claims from input
+│   │   ├── webSearchRetrieval.js    # Stage 2a: live web search (Tavily)
+│   │   ├── vectorStore.js           # Stage 2b: curated KB (ChromaDB)
+│   │   ├── evidenceRetrieval.js     # Merges web + vector evidence (hybrid mode)
+│   │   ├── verdictGeneration.js     # Stage 3: LLM verdict + citations
+│   │   └── aggregateScore.js        # Phase 3: multi-claim credibility scoring
+│   ├── models/
+│   │   └── QueryHistory.js          # MongoDB schema for past queries
+│   └── scripts/
+│       └── seedKnowledgeBase.js     # Populates the curated vector KB
 └── frontend/
-└── src/
-├── App.jsx
-├── api/verify.js # API client
-└── components/
-├── ClaimInput.jsx
-├── VerdictCard.jsx
-├── CitationList.jsx
-├── AggregateScore.jsx
-└── HistoryPanel.jsx
+    └── src/
+        ├── App.jsx
+        ├── api/
+        │   └── verify.js            # API client
+        └── components/
+            ├── ClaimInput.jsx
+            ├── VerdictCard.jsx
+            ├── CitationList.jsx
+            ├── AggregateScore.jsx
+            └── HistoryPanel.jsx
+```
+
+**Request flow:** `App.jsx` → `api/verify.js` → `routes/verify.js` → `claimExtraction.js` → `evidenceRetrieval.js` (fans out to `webSearchRetrieval.js` + `vectorStore.js`) → `verdictGeneration.js` → (`aggregateScore.js` for articles) → persisted via `QueryHistory.js` → rendered by `VerdictCard.jsx` / `CitationList.jsx` / `AggregateScore.jsx`.
 
 ## Setup & Installation
 
@@ -184,6 +199,13 @@ Runs on `http://localhost:5173`.
   ]
 }
 ```
+
+### Screenshots
+
+| Input | Output |
+| --- | --- |
+| ![Claim input screen](docs/screenshots/input.jpg) | ![Verdict with confidence and citations](docs/screenshots/output.jpg) |
+| Pasting a claim and choosing the hybrid (web + curated KB) evidence source | Resulting verdict, confidence score, reasoning, and expandable source citations |
 
 ## Why RAG Instead of a Classifier?
 
