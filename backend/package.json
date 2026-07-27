@@ -1,0 +1,26 @@
+{
+  "name": "fact-check-rag-backend",
+  "version": "1.0.0",
+  "description": "RAG-based fact verification backend",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node scripts/seedKnowledgeBase.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "mongoose": "^8.5.1",
+    "@google/genai": "^0.15.0",
+    "axios": "^1.7.4",
+    "chromadb": "^1.9.2",
+    "uuid": "^9.0.1",
+    "express-rate-limit": "^7.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}
