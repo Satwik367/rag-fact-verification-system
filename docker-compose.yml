@@ -1,0 +1,40 @@
+services:
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: backend
+    env_file:
+      - ./backend/.env
+    environment:
+      # Overrides CHROMA_URL from .env: inside Docker's network, containers
+      # reach each other by service name, not "localhost".
+      - CHROMA_URL=http://chromadb:8000
+    ports:
+      - "5000:5000"
+    depends_on:
+      - chromadb
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    environment:
+      # Tells Vite's dev server to proxy /api calls to the backend
+      # container by its service name instead of localhost.
+      - VITE_BACKEND_URL=http://backend:5000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  chroma-data:
