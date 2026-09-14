@@ -1,5 +1,56 @@
-import { generateJSON } from "../config/geminiClient.js";
+import { generateJSON, streamGenerateText } from "../config/geminiClient.js";
 import { credibilityLabel } from "./sourceCredibility.js";
+
+/**
+ * Builds the shared evidence block text used by both the streaming
+ * reasoning prompt and the final structured verdict prompt, so the two
+ * calls are evaluating the exact same evidence presentation.
+ */
+function buildEvidenceBlock(evidence) {
+  return evidence
+    .map(
+      (e, i) =>
+        `[${i}] Source: ${e.title}\nURL: ${e.url || "N/A"}\nCredibility: ${credibilityLabel(
+          e.credibility ?? 0.4
+        )}\nSnippet: ${e.snippet}`
+    )
+    .join("\n\n");
+}
+
+/**
+ * Streams a free-text reasoning analysis for a claim against its evidence,
+ * invoking onChunk as text arrives. This is a separate, lighter-weight call
+ * used purely for live UX (watching the model "think" in real time) - the
+ * authoritative structured verdict still comes from generateVerdict below,
+ * so accuracy/behavior there is unaffected by streaming mode.
+ */
+export async function streamVerdictReasoning(claim, evidence, onChunk) {
+  if (!evidence.length) {
+    const message = "No relevant evidence could be retrieved for this claim.";
+    onChunk(message);
+    return message;
+  }
+
+  const evidenceBlock = buildEvidenceBlock(evidence);
+
+  const prompt = `
+You are a rigorous, neutral fact-checking analyst. Think through whether the
+EVIDENCE below supports, contradicts, or is insufficient to verify the CLAIM.
+
+Write your reasoning as flowing prose (3-5 sentences), referencing evidence
+by index number, e.g. "[0]". Weigh higher-credibility sources more heavily
+when evidence conflicts. Do NOT include a final JSON verdict or a summary
+label - just the reasoning itself, as if thinking out loud.
+
+CLAIM:
+"${claim}"
+
+EVIDENCE:
+${evidenceBlock}
+`;
+
+  return await streamGenerateText(prompt, onChunk);
+}
 
 /**
  * Stage 3: Verdict Generation
@@ -17,14 +68,7 @@ export async function generateVerdict(claim, evidence) {
     };
   }
 
-  const evidenceBlock = evidence
-    .map(
-      (e, i) =>
-        `[${i}] Source: ${e.title}\nURL: ${e.url || "N/A"}\nCredibility: ${credibilityLabel(
-          e.credibility ?? 0.4
-        )}\nSnippet: ${e.snippet}`
-    )
-    .join("\n\n");
+  const evidenceBlock = buildEvidenceBlock(evidence);
 
   const prompt = `
 You are a rigorous, neutral fact-checking analyst. You will be given a CLAIM

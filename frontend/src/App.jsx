@@ -3,7 +3,8 @@ import ClaimInput from "./components/ClaimInput.jsx";
 import VerdictCard from "./components/VerdictCard.jsx";
 import AggregateScore from "./components/AggregateScore.jsx";
 import HistoryPanel from "./components/HistoryPanel.jsx";
-import { verifyClaim, verifyArticle } from "./api/verify.js";
+import StreamingVerdict from "./components/StreamingVerdict.jsx";
+import { verifyClaim, verifyArticle, streamVerifyClaim } from "./api/verify.js";
 
 export default function App() {
   const [loading, setLoading] = useState(false);
@@ -13,15 +14,46 @@ export default function App() {
   const [aggregateScore, setAggregateScore] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  async function handleSubmit({ text, inputType, mode }) {
-    setLoading(true);
-    setError(null);
+  // Streaming-mode state
+  const [streamClaim, setStreamClaim] = useState(null);
+  const [streamEvidenceCount, setStreamEvidenceCount] = useState(null);
+  const [streamReasoning, setStreamReasoning] = useState("");
+  const [streamIsStreaming, setStreamIsStreaming] = useState(false);
+  const [streamFinalVerdict, setStreamFinalVerdict] = useState(null);
+
+  function resetAllResults() {
     setSingleResult(null);
     setArticleResults(null);
     setAggregateScore(null);
+    setStreamClaim(null);
+    setStreamEvidenceCount(null);
+    setStreamReasoning("");
+    setStreamIsStreaming(false);
+    setStreamFinalVerdict(null);
+  }
+
+  async function handleSubmit({ text, inputType, mode, streamMode }) {
+    setLoading(true);
+    setError(null);
+    resetAllResults();
 
     try {
-      if (inputType === "article") {
+      if (streamMode && inputType === "claim") {
+        setStreamIsStreaming(true);
+        await streamVerifyClaim(text, mode, {
+          onClaim: (claim) => setStreamClaim(claim),
+          onEvidenceCount: (count) => setStreamEvidenceCount(count),
+          onReasoningChunk: (chunk) => setStreamReasoning((prev) => prev + chunk),
+          onVerdict: (verdict) => {
+            setStreamFinalVerdict(verdict);
+            setStreamIsStreaming(false);
+          },
+          onError: (message) => {
+            setError(message);
+            setStreamIsStreaming(false);
+          },
+        });
+      } else if (inputType === "article") {
         const data = await verifyArticle(text, mode);
         setArticleResults(data.claims);
         setAggregateScore(data.aggregateScore);
@@ -35,6 +67,8 @@ export default function App() {
       setLoading(false);
     }
   }
+
+  const showStreamingCard = streamClaim || streamReasoning || streamFinalVerdict;
 
   return (
     <div className="app">
@@ -59,6 +93,16 @@ export default function App() {
       {error && <div className="error-banner">{error}</div>}
 
       {singleResult && <VerdictCard result={singleResult} />}
+
+      {showStreamingCard && (
+        <StreamingVerdict
+          claim={streamClaim}
+          evidenceCount={streamEvidenceCount}
+          reasoningText={streamReasoning}
+          isStreaming={streamIsStreaming}
+          finalVerdict={streamFinalVerdict}
+        />
+      )}
 
       {articleResults && (
         <div className="article-results">

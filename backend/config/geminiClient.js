@@ -37,6 +37,30 @@ export async function generateJSON(prompt) {
 }
 
 /**
+ * Streams a free-text (non-JSON) response from Gemini, invoking onChunk
+ * with each piece of text as it arrives. Returns the full concatenated
+ * text once the stream completes. Used for real-time reasoning display
+ * rather than waiting for a full structured response.
+ */
+export async function streamGenerateText(prompt, onChunk) {
+  const stream = await ai.models.generateContentStream({
+    model: CHAT_MODEL,
+    contents: prompt,
+    config: { temperature: 0.2 },
+  });
+
+  let fullText = "";
+  for await (const chunk of stream) {
+    const piece = chunk.text || "";
+    if (piece) {
+      fullText += piece;
+      onChunk(piece);
+    }
+  }
+  return fullText;
+}
+
+/**
  * Calls Gemini with automatic retry on transient errors (503 overloaded,
  * 429 rate limited). Free-tier Gemini keys hit these fairly often under
  * load, and they usually clear up within a few seconds.
@@ -77,7 +101,7 @@ async function callGeminiWithRetry(prompt, maxRetries = 3) {
  * depth (respecting strings so braces inside quoted text don't confuse it).
  * Returns the substring of just that object, or null if none found.
  */
-function extractFirstJsonObject(text) {
+export function extractFirstJsonObject(text) {
   const start = text.indexOf("{");
   if (start === -1) return null;
 

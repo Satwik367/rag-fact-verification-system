@@ -42,7 +42,7 @@ export async function retrieveEvidence(claim, mode = "hybrid") {
   return evidence.slice(0, 8);
 }
 
-function combinedRank(evidenceItem) {
+export function combinedRank(evidenceItem) {
   const relevance = evidenceItem.score ?? 0.6; // neutral default if a source gave no score
   const credibility = evidenceItem.credibility ?? 0.4;
   return relevance * 0.6 + credibility * 0.4;

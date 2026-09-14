@@ -301,3 +301,53 @@ button:disabled {
 .no-history {
   color: #6b7280;
 }
+
+.stream-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.stream-toggle input[type="checkbox"]:disabled + * {
+  opacity: 0.5;
+}
+
+.stream-toggle input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.streaming-card {
+  border-left-color: #818cf8;
+}
+
+.evidence-count-note {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  margin: 4px 0 8px;
+}
+
+.streaming-label {
+  color: #818cf8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.streaming-text {
+  min-height: 1.5em;
+}
+
+.cursor-blink {
+  animation: blink 1s step-start infinite;
+  color: #818cf8;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
