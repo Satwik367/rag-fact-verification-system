@@ -1,4 +1,5 @@
 import { generateJSON } from "../config/geminiClient.js";
+import { credibilityLabel } from "./sourceCredibility.js";
 
 /**
  * Stage 3: Verdict Generation
@@ -19,13 +20,17 @@ export async function generateVerdict(claim, evidence) {
   const evidenceBlock = evidence
     .map(
       (e, i) =>
-        `[${i}] Source: ${e.title}\nURL: ${e.url || "N/A"}\nSnippet: ${e.snippet}`
+        `[${i}] Source: ${e.title}\nURL: ${e.url || "N/A"}\nCredibility: ${credibilityLabel(
+          e.credibility ?? 0.4
+        )}\nSnippet: ${e.snippet}`
     )
     .join("\n\n");
 
   const prompt = `
 You are a rigorous, neutral fact-checking analyst. You will be given a CLAIM
-and a numbered list of EVIDENCE snippets retrieved from real sources.
+and a numbered list of EVIDENCE snippets retrieved from real sources. Each
+piece of evidence includes a credibility label reflecting the general
+reliability of its source domain.
 
 Your job:
 1. Decide whether the evidence SUPPORTS, CONTRADICTS, or is INSUFFICIENT to
@@ -36,8 +41,10 @@ Your job:
    referencing evidence by its index number, e.g. "[0]".
 4. List which evidence indices you actually relied on as citations.
 
-Do not use outside knowledge beyond what's in the evidence. If evidence is
-mixed or thin, prefer "unverifiable" over guessing.
+When evidence conflicts, give more weight to higher-credibility sources, but
+still consider the substance of lower-credibility evidence rather than
+dismissing it outright. Do not use outside knowledge beyond what's in the
+evidence. If evidence is mixed or thin, prefer "unverifiable" over guessing.
 
 Return STRICT JSON only, in this exact shape:
 {
@@ -67,6 +74,7 @@ ${evidenceBlock}
       url: evidence[i].url,
       snippet: evidence[i].snippet,
       source: evidence[i].source,
+      credibility: evidence[i].credibility ?? null,
     }));
 
   return {

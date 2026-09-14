@@ -7,7 +7,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node scripts/seedKnowledgeBase.js"
+    "seed": "node scripts/seedKnowledgeBase.js",
+    "eval": "node eval/runBenchmark.js",
+    "eval:web": "node eval/runBenchmark.js web",
+    "eval:vector": "node eval/runBenchmark.js vector",
+    "eval:hybrid": "node eval/runBenchmark.js hybrid"
   },
   "dependencies": {
     "express": "^4.19.2",

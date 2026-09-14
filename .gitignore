@@ -19,6 +19,9 @@ frontend/build/
 *.log
 npm-debug.log*
 
+# Generated benchmark reports (regenerate via npm run eval)
+backend/eval/results/
+
 # OS files
 .DS_Store
 Thumbs.db

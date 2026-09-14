@@ -32,6 +32,18 @@ export async function retrieveEvidence(claim, mode = "hybrid") {
     else console.warn("Vector retrieval failed:", vectorResult.reason?.message);
   }
 
+  // Rank by a blend of topical relevance and source credibility, not
+  // credibility alone - otherwise a highly "trusted" but topically
+  // irrelevant curated-KB entry could outrank genuinely relevant web
+  // evidence purely because of its credibility score.
+  evidence.sort((a, b) => combinedRank(b) - combinedRank(a));
+
   // Cap total evidence passed to the LLM to keep prompts focused
   return evidence.slice(0, 8);
+}
+
+function combinedRank(evidenceItem) {
+  const relevance = evidenceItem.score ?? 0.6; // neutral default if a source gave no score
+  const credibility = evidenceItem.credibility ?? 0.4;
+  return relevance * 0.6 + credibility * 0.4;
 }

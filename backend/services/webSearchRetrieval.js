@@ -1,4 +1,5 @@
 import axios from "axios";
+import { scoreCredibility } from "./sourceCredibility.js";
 
 /**
  * Stage 2a: Evidence Retrieval — live web search (Phase 1)
@@ -22,5 +23,6 @@ export async function retrieveWebEvidence(claim, maxResults = 5) {
     url: r.url,
     snippet: r.content?.slice(0, 1200) || "",
     score: r.score ?? null,
+    credibility: scoreCredibility(r.url),
   }));
 }

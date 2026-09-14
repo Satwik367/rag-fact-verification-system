@@ -1,5 +1,14 @@
 import { ChromaClient } from "chromadb";
 import { embedText } from "../config/geminiClient.js";
+import { scoreCredibility } from "./sourceCredibility.js";
+
+// Minimum similarity score (0-1) for a curated-KB match to be considered
+// genuinely relevant evidence. Below this, ChromaDB is just returning its
+// "closest available" result even though the topic isn't actually covered
+// in the knowledge base - and since curated entries default to a high
+// credibility score, letting those through could outrank truly relevant
+// web evidence for out-of-domain claims. Tune via env if needed.
+const RELEVANCE_THRESHOLD = parseFloat(process.env.CHROMA_RELEVANCE_THRESHOLD || "0.35");
 
 let client;
 let collectionCache;
@@ -57,11 +66,17 @@ export async function retrieveVectorEvidence(claim, topK = 5) {
   const metas = results.metadatas?.[0] || [];
   const distances = results.distances?.[0] || [];
 
-  return docs.map((doc, i) => ({
+  const evidence = docs.map((doc, i) => ({
     source: "vector_kb",
     title: metas[i]?.title || "Curated knowledge base entry",
     url: metas[i]?.url || null,
     snippet: doc.slice(0, 1200),
     score: distances[i] != null ? 1 - distances[i] : null, // convert distance -> similarity-ish
+    credibility: scoreCredibility(metas[i]?.url || null),
   }));
+
+  // Discard matches that aren't actually topically relevant, rather than
+  // returning the "closest available" entry regardless of how weak that
+  // match is - an empty result here is more honest than a misleading one.
+  return evidence.filter((e) => e.score == null || e.score >= RELEVANCE_THRESHOLD);
 }
